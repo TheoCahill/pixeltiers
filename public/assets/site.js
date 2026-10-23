@@ -11,7 +11,7 @@
 
 const BOOT = JSON.parse(document.getElementById('boot').textContent);
 
-const DISCORD_INVITE = BOOT.discordInvite || '';
+const DISCORD_INVITE = 'https://discord.gg/4BXkG6nh8y';
 const REFRESH_SECONDS = BOOT.refreshSeconds || 20;
 const LABEL = { 'money-smp': 'Diamond SMP', nethpot: 'NethPot' };
 const label = (m) => LABEL[m.key] || m.name;
@@ -301,14 +301,8 @@ document.addEventListener('click', (e) => {
 
 $('q').oninput = () => render();
 
-/* ---- theme, colours, gradients ---- */
-const ACCENTS = [
-  ['Yellow', '#ffe14d'],
-  ['Gold', '#F5B820'], ['Amber', '#ffa620'], ['Orange', '#ff8a3d'], ['Coral', '#ff6b5e'], ['Red', '#ff4d4d'], ['Crimson', '#e11d48'],
-  ['Rose', '#fb7185'], ['Pink', '#ec4899'], ['Magenta', '#d946ef'], ['Purple', '#a855f7'], ['Violet', '#8b5cf6'], ['Indigo', '#6366f1'],
-  ['Blue', '#3b82f6'], ['Sky', '#38bdf8'], ['Cyan', '#22d3ee'], ['Aqua', '#2dd4bf'], ['Teal', '#14b8a6'], ['Silver', '#d4d4d8'],
-];
-
+/* ---- one fixed theme (Night Arcade); only per-viewer settings left are the sound toggle ---- */
+document.documentElement.dataset.theme = 'dark';
 
 const store = {
   get: (k) => {
@@ -326,90 +320,6 @@ const store = {
     }
   },
 };
-
-let theme = store.get('st-theme') || 'dark';
-let accent = store.get('st-accent2') || '#F5B820';
-
-function hsl(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const mx = Math.max(r, g, b);
-  const mn = Math.min(r, g, b);
-  const l = (mx + mn) / 2;
-  let h = 0;
-  let s = 0;
-  if (mx !== mn) {
-    const d = mx - mn;
-    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-    h = (mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4) * 60;
-  }
-  return [h, s, l, 0.2126 * r + 0.7152 * g + 0.0722 * b];
-}
-
-const hs = (h, s, l) => `hsl(${Math.round(h)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
-const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',');
-
-function applyTheme() {
-  const light = theme === 'light';
-  const R = document.documentElement;
-  if (!/^#[0-9a-f]{6}$/i.test(accent)) accent = '#F5B820';
-  const [h, sat, l, lum] = hsl(accent);
-
-  R.dataset.theme = theme;
-  R.style.setProperty('--accent', accent);
-  R.style.setProperty('--accent-hover', hs(h, sat, Math.min(0.8, l + 0.08)));
-  R.style.setProperty('--accent-rgb', rgbOf(accent));
-  R.style.setProperty('--on', lum > 0.4 ? '#1a1200' : '#ffffff');
-
-  store.set('st-theme', theme);
-  store.set('st-accent2', accent);
-
-  $('tp').innerHTML = `<h4>Mode</h4><div class="seg"><button data-th="light" class="${light ? 'on' : ''}">Light</button><button data-th="dark" class="${
-    light ? '' : 'on'
-  }">Dark</button></div>
-  <h4>Colour</h4><div class="sw">${ACCENTS.map(
-    ([n, c]) =>
-      `<button data-ac="${c}" title="${n}" aria-label="${n}" class="${c === accent ? 'on' : ''}" style="background:${c};color:${
-        hsl(c)[3] > 0.45 ? '#0a0a0a' : '#fff'
-      }"></button>`
-  ).join('')}</div>
-  <h4>Click sound</h4><div class="snds">${Object.keys(SOUNDS)
-    .map((n) => `<button data-snd="${n}" class="${n === sound ? 'on' : ''}">${n}</button>`)
-    .join('')}</div>`;
-}
-
-$('th').onclick = (e) => {
-  e.stopPropagation();
-  $('tp').hidden = !$('tp').hidden;
-};
-
-$('tp').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const t = e.target.closest('[data-th]');
-  const a = e.target.closest('[data-ac]');
-  const sn = e.target.closest('[data-snd]');
-
-  if (t) theme = t.dataset.th;
-  else if (a) accent = a.dataset.ac;
-  else if (sn) {
-    sound = sn.dataset.snd;
-    store.set('st-sound', sound);
-    if (muted) {
-      muted = false;
-      store.set('st-mute', '0');
-      sndIcon();
-    }
-    tick();
-  } else return;
-
-  applyTheme();
-});
-
-document.addEventListener('click', () => {
-  $('tp').hidden = true;
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') $('tp').hidden = true;
-});
 
 /* ---- click sounds: each is a list of [wave, startHz, endHz, seconds, volume, delay] ---- */
 const SOUNDS = {
@@ -505,7 +415,6 @@ async function load() {
   route();
 }
 
-applyTheme();
 buildTabs();
 buildInfo();
 buildStore();

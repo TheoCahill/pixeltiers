@@ -269,13 +269,9 @@ footer .inline { display: inline; }
 .linkbtn:hover { color: var(--text); }
 
 /* ---- remodel: pixel arcade ---- */
-@font-face { font-family: 'Pixelify Sans'; src: url('/assets/fonts/pixelify-sans-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-@font-face { font-family: 'Pixelify Sans'; src: url('/assets/fonts/pixelify-sans-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
-@font-face { font-family: 'Atkinson Hyperlegible'; src: url('/assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
-@font-face { font-family: 'Atkinson Hyperlegible'; src: url('/assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
-:root { --pixel: 'Pixelify Sans', 'Courier New', monospace; --edge: #05050f; }
+:root { --pixel: 'Minecraft', 'Courier New', monospace; --edge: #05050f; }
 :root[data-theme="light"] { --edge: #20204a; }
-body { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+body { font-family: 'Minecraft', monospace; font-size: 16px; line-height: 1.5; }
 h1, h2, h3, nav a, .cta, .stat b, .rank, .pts, .nm, .price, .n, .pm b, .tb .tt, .rk-head { font-family: var(--pixel); }
 h1 { letter-spacing: 0; }
 
@@ -399,3 +395,11 @@ footer.wrap { padding-top: 28px; }
   .ib { width: 32px; height: 32px; }
   .acts .cta { padding: 7px 9px; font-size: 12px; }
 }
+
+/* ---- Minecraft font everywhere ---- */
+@font-face { font-family: 'Minecraft'; src: url('/assets/fonts/minecraft.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+*, *::before, *::after { font-family: 'Minecraft', 'Courier New', monospace; font-synthesis: none; }
+h1, h2, h3, h4, b, strong, th, .wm, .wm b, .cta, nav a, .stat b, .nm, .pts, .price { font-weight: 400; }
+body { font-size: 17px; letter-spacing: 0.2px; }
+footer .dlink { color: var(--accent); text-decoration: none; }
+footer .dlink:hover { text-decoration: underline; }
