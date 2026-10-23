@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pixel Tiers: Minecraft PvP Rankings</title>
+<meta name="description" content="Live Minecraft PvP tier rankings. Every player, every gamemode, tested head-to-head.">
+<meta name="theme-color" content="#0d0d26">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+<link rel="icon" type="image/png" sizes="128x128" href="/assets/crown.png">
+<link rel="apple-touch-icon" href="/assets/crown.png">
+<link rel="stylesheet" href="/assets/site.css">
+<meta property="og:title" content="Pixel Tiers: Minecraft PvP Rankings">
+<meta property="og:description" content="Live Minecraft PvP tier rankings.">
+<meta property="og:image" content="/assets/logo@2x.png">
+<meta property="og:site_name" content="Pixel Tiers">
+</head>
+<body>
+<div class="bgfx"></div>
+<header><div class="wrap bar">
+  <a class="logo" href="#/home" aria-label="Pixel Tiers"><img class="logo-crown" src="/assets/crown.png" alt="" width="44" height="44"><span class="wm" aria-hidden="true"><i>P</i><i>I</i><i>X</i><i>E</i><i>L</i><b>TIERS</b></span></a>
+  <nav><a id="nh" href="#/home">Home</a><a id="nt" href="#/tiers">Tiers</a><a id="ni" href="#/info">Info</a><a id="ns" href="#/store">Store</a></nav>
+  <div class="acts">
+    <a class="cta" data-discord target="_blank" rel="noopener noreferrer">Get tested</a>
+    <button class="ib" id="snd" aria-label="Toggle click sounds" title="Click sounds on/off"></button>
+    <button class="ib" id="th" aria-label="Theme" title="Theme, colours and sounds"><svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"/><rect x="8" y="2" width="6" height="12" fill="currentColor"/></svg></button>
+    <div id="tp" hidden></div>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <section id="home" hidden>
+    <div class="hero">
+      <div class="live"><span class="dot"></span><span class="lt">Connecting…</span></div>
+      <img class="hero-logo" src="/assets/logo@2x.png" width="420" height="353" alt="Pixel Tiers">
+      <h1 class="sr-only">Pixel Tiers</h1>
+      <p>Minecraft PvP rankings, tested head-to-head and updated live, all day, every day.</p>
+      <div class="btns"><a class="cta big" href="#/tiers">View tiers</a><a class="cta big ghost" data-discord target="_blank" rel="noopener noreferrer">Get tested</a></div>
+      <div class="stats" id="stats">
+        <div class="stat"><b><%= counts.players %></b><span>Players ranked</span></div>
+        <div class="stat"><b><%= counts.tiers %></b><span>Tiers awarded</span></div>
+        <div class="stat"><b><%= counts.modes %></b><span>Gamemodes</span></div>
+      </div>
+    </div>
+    <h2 class="ih" style="text-align:center">Top of the ladder</h2>
+    <div class="top3" id="top3"></div>
+    <div class="feat">
+      <div class="card"><div class="em"><img src="/assets/crown.png" alt="" width="32" height="32"></div><h3>Tested, not guessed</h3><p>Every tier is earned in a real fight against a tester.</p></div>
+      <div class="card"><div class="em"><svg viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M9 1H5L3 9h3l-1 6 7-9H8z"/></svg></div><h3>Always live</h3><p>The moment a tester saves a result in Discord, it shows up here.</p></div>
+      <div class="card"><div class="em"><svg viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="M8 1l7 7-7 7-7-7z"/></svg></div><h3><%= counts.modes %> gamemodes</h3><p>From Crystal to Cart. Your tiers add up to one overall score.</p></div>
+    </div>
+  </section>
+
+  <section id="tiers" hidden>
+    <div class="hero">
+      <div class="live"><span class="dot"></span><span class="lt">Connecting…</span></div>
+      <h1>Minecraft PvP Rankings</h1>
+      <p>Every player, every gamemode, tested head-to-head.</p>
+    </div>
+    <div class="modes" id="modes" role="tablist"></div>
+    <div class="tools">
+      <input id="q" type="search" placeholder="Search a player" aria-label="Search a player">
+    </div>
+    <div id="out"></div>
+  </section>
+
+  <section id="prof" hidden></section>
+  <section id="info" hidden></section>
+  <section id="store" hidden>
+    <div class="hero"><h1>Ranks</h1><p>Support the server and stand out. Diamond and Platinum are one-time purchases. Zinc and Pixle are monthly subscriptions.</p></div>
+    <div class="ranks" id="ranks"></div>
+    <p class="muted members-note">Normal members: 7-day cooldown on testing and 2 custom kits. Custom kits are kits you can save your own layout for with /kiteditor. Capes show on your back in game.</p>
+    <p class="sub" style="text-align:center;margin-bottom:40px">Checkout is not open yet. The buttons below will say <b>Coming soon</b> until it is.<br>Monthly ranks will renew every month until cancelled; when a subscription ends, the rank is removed in game and in Discord.<br>Ranks are cosmetic and don't give any gameplay advantage in Minecraft.</p>
+  </section>
+</main>
+
+<footer class="wrap">
+  Made by NandoMC_ · Owner of Pixel Tiers: XclsFrogMC<br>Not affiliated with Mojang or Microsoft.
+  <div class="staff">
+    <% if (user) { %>
+      Signed in as <b><%= user.username %></b><% if (user.admin) { %> · <a href="/admin">Admin</a><% } %>
+      · <form method="post" action="/auth/logout" class="inline"><button class="linkbtn" type="submit">Log out</button></form>
+    <% } else { %>
+      <a href="/auth/discord">Staff login</a>
+    <% } %>
+  </div>
+</footer>
+
+<script id="boot" type="application/json"><%- JSON.stringify(boot).replace(/</g, '\\u003c') %></script>
+<script src="/assets/site.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin: Pixel Tiers</title>
+<meta name="theme-color" content="#101010">
+<link rel="stylesheet" href="/assets/site.css">
+<link rel="stylesheet" href="/assets/admin.css">
+</head>
+<body>
+<div class="bgfx"></div>
+<header><div class="wrap bar">
+  <a class="logo" href="/"><img src="/assets/logo.png" srcset="/assets/logo.png 1x, /assets/logo@2x.png 2x" alt="Pixel Tiers" height="40"></a>
+  <nav><a href="/">← Back to site</a></nav>
+  <div class="acts">
+    <span class="adm-user">
+      <% if (user.avatar) { %><img src="<%= user.avatar %>" alt=""><% } %>
+      <%= user.username %>
+    </span>
+    <form method="post" action="/auth/logout"><button class="cta ghost" type="submit">Log out</button></form>
+  </div>
+</div></header>
+
+<main class="wrap adm">
+  <h1 class="adm-title">Admin</h1>
+  <p class="sub">Results update the site and Discord immediately. Every action here is forwarded to the bot. This page never writes to the database itself.</p>
+
+  <% if (message) { %><div class="flash ok"><%= message %></div><% } %>
+  <% if (error) { %><div class="flash bad"><%= error %></div><% } %>
+  <% if (botError) { %>
+    <div class="flash bad">
+      The bot API is unreachable: <%= botError %>. Tier resets and punishments are disabled until it is back
+      (check <code>systemctl status spadetiers-bot</code>).
+    </div>
+  <% } %>
+
+  <section class="adm-stats">
+    <div class="stat"><b><%= stats.players %></b><span>Ranked players</span></div>
+    <div class="stat"><b><%= stats.tiers %></b><span>Tiers</span></div>
+    <div class="stat"><b><%= stats.linked %></b><span>Linked accounts</span></div>
+    <div class="stat"><b><%= stats.openTickets %></b><span>Open tickets</span></div>
+    <div class="stat"><b><%= stats.activePunishments %></b><span>Active punishments</span></div>
+  </section>
+
+  <% if (overview) { %>
+  <section class="grid-2">
+    <div class="card">
+      <h2>Reset tiers</h2>
+      <p>Always takes a database backup before deleting anything. Matching Discord roles are removed.</p>
+      <form method="post" action="/admin/reset" class="adm-form">
+        <input type="hidden" name="csrf" value="<%= user.csrf %>">
+        <label>Server
+          <select name="guildId" required>
+            <% overview.guilds.forEach(function (g) { %><option value="<%= g.id %>"><%= g.name %></option><% }) %>
+          </select>
+        </label>
+        <label>Scope
+          <select name="scope" required>
+            <option value="gamemode">One gamemode</option>
+            <option value="player">One player</option>
+            <option value="all">Everything (all players, all gamemodes)</option>
+          </select>
+        </label>
+        <label>Gamemode (for a gamemode reset, or to limit a player reset)
+          <select name="gamemode">
+            <option value="">-</option>
+            <% modes.forEach(function (m) { %><option value="<%= m.key %>"><%= m.display %></option><% }) %>
+          </select>
+        </label>
+        <label>Minecraft username (for a player reset)
+          <input name="player" maxlength="16" placeholder="Steve" autocomplete="off">
+        </label>
+        <button class="cta danger" type="submit">Reset tiers</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Punishments</h2>
+      <p>Written to the database and the Discord mod-log. Restrictions remove the player from every queue; blacklists are server bans.</p>
+      <form method="post" action="/admin/punish" class="adm-form">
+        <input type="hidden" name="csrf" value="<%= user.csrf %>">
+        <label>Server
+          <select name="guildId" required>
+            <% overview.guilds.forEach(function (g) { %><option value="<%= g.id %>"><%= g.name %></option><% }) %>
+          </select>
+        </label>
+        <label>Discord user ID
+          <input name="userId" inputmode="numeric" pattern="\d{5,25}" placeholder="123456789012345678" required>
+        </label>
+        <label>Type
+          <select name="type" required>
+            <option value="warn">Warn</option>
+            <option value="mute">Mute (timeout)</option>
+            <option value="ban">Blacklist (server ban)</option>
+            <option value="test_ban">Restrict (tier testing)</option>
+          </select>
+        </label>
+        <label>Duration (mute/bans; empty = permanent)
+          <input name="duration" placeholder="7d" autocomplete="off">
+        </label>
+        <label>Reason
+          <input name="reason" maxlength="400" required>
+        </label>
+        <button class="cta danger" type="submit">Apply punishment</button>
+      </form>
+
+      <h2 class="adm-sub">Lift a ban</h2>
+      <form method="post" action="/admin/unban" class="adm-form inline">
+        <input type="hidden" name="csrf" value="<%= user.csrf %>">
+        <label>Server
+          <select name="guildId" required>
+            <% overview.guilds.forEach(function (g) { %><option value="<%= g.id %>"><%= g.name %></option><% }) %>
+          </select>
+        </label>
+        <label>Discord user ID
+          <input name="userId" inputmode="numeric" pattern="\d{5,25}" placeholder="123456789012345678" required>
+        </label>
+        <label>Type
+          <select name="scope">
+            <option value="all">All</option>
+            <option value="server">Blacklist (server)</option>
+            <option value="tier_test">Restriction (tier testing)</option>
+          </select>
+        </label>
+        <button class="cta ghost" type="submit">Lift ban</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="card">
+      <h2>Recent results</h2>
+      <% if (!stats.recentResults.length) { %><p>No results yet.</p><% } else { %>
+      <table class="adm-table">
+        <% stats.recentResults.forEach(function (r) { %>
+        <tr>
+          <td><b><%= r.tier %></b> <%= (modes.find(function (x) { return x.key === r.gamemode; }) || { display: r.gamemode }).display %></td>
+          <td><%= r.username %></td>
+          <td class="muted"><%= new Date(r.created_at).toISOString().replace('T', ' ').slice(0, 16) %> UTC</td>
+        </tr>
+        <% }) %>
+      </table>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Backups</h2>
+      <% if (!overview.backups.length) { %><p>No backups yet. A backup is taken automatically before every reset.</p><% } else { %>
+      <table class="adm-table">
+        <% overview.backups.slice(0, 8).forEach(function (b) { %>
+        <tr>
+          <td><code><%= b.name %></code></td>
+          <td class="muted"><%= Math.round(b.size / 1024) %> KiB</td>
+        </tr>
+        <% }) %>
+      </table>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Audit log</h2>
+    <% if (!stats.recentAudit.length) { %><p>Nothing recorded yet.</p><% } else { %>
+    <table class="adm-table">
+      <% stats.recentAudit.forEach(function (a) { %>
+      <tr>
+        <td><b><%= a.action %></b> <span class="muted"><%= a.actor_kind %> · <%= a.actor_id %></span></td>
+        <td class="muted"><%= a.subject || '' %></td>
+        <td class="muted"><%= new Date(a.created_at).toISOString().replace('T', ' ').slice(0, 16) %> UTC</td>
+      </tr>
+      <% }) %>
+    </table>
+    <% } %>
+  </section>
+  <% } %>
+</main>
+
+<dialog id="rs-dlg">
+  <form method="dialog" class="adm-form">
+    <p>This deletes tiers after a backup is taken.</p>
+    <label id="rs-type" hidden>Type RESET to confirm<input id="rs-in" autocomplete="off"></label>
+    <div class="adm-form inline">
+      <button class="cta ghost" value="no">Cancel</button>
+      <button class="cta danger" id="rs-ok" value="yes">Reset tiers</button>
+    </div>
+  </form>
+</dialog>
+<script src="/assets/admin.js" defer></script>
+
+<footer class="wrap">Pixel Tiers admin · schema v<%= stats ? (overview ? overview.schema : '-') : '-' %></footer>
+</body>
+</html>
