@@ -1,389 +1,112 @@
 'use strict';
 
 const path = require('node:path');
-const crypto = require('node:crypto');
 const express = require('express');
 
-const { loadConfig } = require('../shared/config');
-const { openDatabase } = require('../shared/db');
-const logger = require('../shared/logger');
-const gamemodes = require('../shared/gamemodes');
-const tiers = require('../shared/tiers');
+// ---- Mock data that the real app reads from its shared database ----
 
-const data = require('./lib/data');
-const session = require('./lib/session');
-const discord = require('./lib/discord');
-const { callBot } = require('./lib/botApi');
-const { createRateLimit } = require('./lib/rateLimit');
+const GAMEMODES = [
+  { key: 'sword', display: 'Sword', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 1h2v8h2v2H4v3H2v-3H0V9h2z"/></svg>' },
+  { key: 'axe', display: 'Axe', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M2 2h6v3H6v2H4v6H2V2z"/></svg>' },
+  { key: 'crystal', display: 'Crystal', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M6 1h4l3 5-5 9-5-9z"/></svg>' },
+  { key: 'mace', display: 'Mace', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M7 1h2v8h2v2h2v3H3v-3h2v-2h2z"/></svg>' },
+  { key: 'nethpot', display: 'NethPot', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M3 4h2v8h6V4h2v10H3z"/></svg>' },
+  { key: 'uhc', display: 'UHC', icon: '<svg viewBox="0 0 16 16" width="18" height="18" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M3 2h2v12H3zM7 2h2v12H7zM11 2h2v12h-2z"/></svg>' },
+];
 
-/**
- * The public website.
- *
- * It opens the shared SQLite file READ-ONLY and never writes to it. Tier resets
- * and punishments in the admin view are posted to the bot's control API, so the
- * bot remains the only writer, which is what keeps the site and Discord from
- * ever disagreeing about a result.
- *
- * The page itself is one server-rendered shell with hash routing (#/home,
- * #/tiers, #/store, #/p/<name>), matching the design of the previous site.
- */
+const TIERS = ['HT1','LT1','HT2','LT2','HT3','LT3','HT4','LT4','HT5','LT5'];
+const POINTS = { HT1: 15, LT1: 13, HT2: 11, LT2: 9, HT3: 7, LT3: 5, HT4: 3, LT4: 2, HT5: 1, LT5: 1 };
+const TITLES = [
+  { name: 'Unranked', className: 'un', min: 0, range: '0-4' },
+  { name: 'Bronze', className: 'br', min: 5, range: '5-14' },
+  { name: 'Iron', className: 'ir', min: 15, range: '15-29' },
+  { name: 'Gold', className: 'go', min: 30, range: '30-49' },
+  { name: 'Diamond', className: 'di', min: 50, range: '50-74' },
+  { name: 'Netherite', className: 'ne', min: 75, range: '75+' },
+];
 
-const SECURITY_HEADERS = {
-  'x-content-type-options': 'nosniff',
-  'x-frame-options': 'DENY',
-  'referrer-policy': 'strict-origin-when-cross-origin',
-  'permissions-policy': 'geolocation=(), microphone=(), camera=()',
+const PRODUCTS = [
+  { key: 'diamonds', name: 'Diamond', suit: '♦', price: 10, currency: 'USD', monthly: false, perks: ['Custom join message','Cape in game','2 extra custom kits'] },
+  { key: 'hearts', name: 'Platinum', suit: '♥', price: 19.99, currency: 'USD', monthly: false, perks: ['Everything in Diamond','Custom Discord role colour','Priority testing queue'] },
+  { key: 'clubs', name: 'Zinc', suit: '♣', price: 5.5, currency: 'USD', monthly: true, perks: ['Cape in game','1 extra custom kit','No testing cooldown'] },
+  { key: 'spades', name: 'Pixle', suit: '♠', price: 13.5, currency: 'USD', monthly: true, perks: ['Everything in Zinc & Diamond','Custom Discord role','Animated cape','3 extra custom kits'] },
+];
+
+const MOCK_PLAYERS = [
+  { n: 'XclsFrogMC', t: { Sword: 'HT1', Axe: 'HT2', Crystal: 'LT1', Mace: 'HT3', NethPot: 'HT2', UHC: 'LT2' } },
+  { n: 'NandoMC_',   t: { Sword: 'HT2', Axe: 'HT1', Crystal: 'HT2', Mace: 'LT1', NethPot: 'HT3', UHC: 'HT1' } },
+  { n: 'BlazeKnight', t: { Sword: 'LT1', Axe: 'LT2', Crystal: 'HT2', Mace: 'LT3', NethPot: 'LT1', UHC: 'LT3' } },
+  { n: 'EnderQueen', t: { Sword: 'HT2', Axe: 'LT3', Crystal: 'LT2', Mace: 'HT4', NethPot: 'HT2', UHC: 'LT4' } },
+  { n: 'ShadowPvP', t: { Sword: 'HT3', Axe: 'HT3', Crystal: 'LT3', Mace: 'LT2', NethPot: 'LT3' } },
+  { n: 'CreeperCrush', t: { Sword: 'LT3', Axe: 'HT4', Crystal: 'HT4', Mace: 'LT4', UHC: 'HT5' } },
+  { n: 'DiamondHand', t: { Sword: 'HT4', Axe: 'LT4', Crystal: 'LT4', Mace: 'HT5', NethPot: 'LT5' } },
+  { n: 'NinjaBlock', t: { Sword: 'LT2', Axe: 'LT1', Crystal: 'HT1', Mace: 'HT2', NethPot: 'HT1', UHC: 'HT2' } },
+  { n: 'GoldSword77', t: { Sword: 'HT1', Axe: 'LT2', Crystal: 'LT1', UHC: 'LT5' } },
+  { n: 'IronGolem42', t: { Sword: 'HT5', Axe: 'LT5', Crystal: 'LT5', Mace: 'LT5', NethPot: 'LT4', UHC: 'HT4' } },
+];
+
+const PLAYERS = MOCK_PLAYERS.map((p) => {
+  const pts = Object.values(p.t).reduce((a, t) => a + (POINTS[t] || 0), 0);
+  return { ...p, pts };
+}).sort((a, b) => b.pts - a.pts || a.n.localeCompare(b.n));
+
+const COUNTS = {
+  players: PLAYERS.length,
+  tiers: PLAYERS.reduce((a, p) => a + Object.keys(p.t).length, 0),
+  modes: GAMEMODES.length,
 };
 
-function createApp({ db, config, botCall = callBot }) {
-  const app = express();
-  const secureCookies = String(config.PUBLIC_URL || '').startsWith('https://');
-  const adminIds = new Set(
-    String(config.DISCORD_ADMIN_IDS || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-  );
+// ---- App ----
 
-  app.disable('x-powered-by');
-  app.set('views', path.join(__dirname, 'views'));
-  app.set('view engine', 'ejs');
+const app = express();
 
-  app.use((req, res, next) => {
-    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
-    next();
-  });
-  app.use('/assets', express.static(path.join(__dirname, 'public', 'assets'), { maxAge: '1h' }));
-  app.use(express.urlencoded({ extended: false, limit: '16kb' }));
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'ejs');
 
-  // ----------------------------------------------------------------
-  // helpers
-  // ----------------------------------------------------------------
+app.use('/assets', express.static(path.join(__dirname, 'public', 'assets'), { maxAge: '1h' }));
 
-  function currentUser(req) {
-    const s = session.readSession(req, config.SESSION_SECRET);
-    if (!s) return null;
-    return {
-      id: s.id,
-      username: s.username,
-      avatar: s.avatar,
-      admin: !!s.admin,
-      csrf: s.csrf,
-    };
-  }
-
-  function bootFor(user) {
-    return {
-      discordInvite: config.DISCORD_INVITE_URL || '',
-      refreshSeconds: 20,
-      modes: gamemodes.all().map((g) => ({ name: g.display, icon: g.icon, key: g.key })),
-      tiers: tiers.TIERS,
-      points: tiers.POINTS,
-      titles: tiers.TITLES,
-      products: data.products(db),
-      user: user ? { name: user.username, avatar: user.avatar, admin: user.admin } : null,
-    };
-  }
-
-  function requireAdmin(req, res, next) {
-    const user = currentUser(req);
-    if (!user) return res.redirect('/auth/discord');
-    if (!user.admin) {
-      return res.status(403).render('error', {
-        title: 'Not allowed',
-        message: 'This account is not on the administrator list for the site.',
-      });
-    }
-    req.user = user;
-    next();
-  }
-
-  function checkCsrf(req, res, next) {
-    const token = req.body?.csrf || req.get('x-csrf-token');
-    if (!token || !req.user?.csrf || token !== req.user.csrf) {
-      return res.status(403).render('error', {
-        title: 'Expired form',
-        message: 'That form expired or was tampered with. Reload the admin page and try again.',
-      });
-    }
-    next();
-  }
-
-  function fail(res, message) {
-    return res.status(400).render('error', { title: 'Action failed', message });
-  }
-
-  // ----------------------------------------------------------------
-  // public pages + data
-  // ----------------------------------------------------------------
-
-  app.get('/', (req, res) => {
-    const user = currentUser(req);
-    res.render('index', {
-      user,
-      boot: bootFor(user),
-      counts: data.siteCounts(db),
-    });
-  });
-
-  app.get('/api/players', (req, res) => {
-    res.setHeader('cache-control', 'no-store');
-    const players = data.playersForSite(db);
-    res.json({
-      ok: true,
-      updatedAt: Date.now(),
-      counts: data.siteCounts(db),
-      players,
-    });
-  });
-
-  app.get('/healthz', (req, res) => {
-    try {
-      db.prepare('SELECT 1 AS x').get();
-      res.json({ ok: true, service: 'pixeltiers-web' });
-    } catch (err) {
-      res.status(500).json({ ok: false, error: err.message });
-    }
-  });
-
-  // ----------------------------------------------------------------
-  // Minecraft plugin endpoints
-  //
-  // The plugin's configured base URL is this site's /api/plugin. Only the three
-  // player-facing routes are exposed, never the /admin/* routes, and the
-  // plugin's own bearer secret is forwarded untouched, so the website does not
-  // become a way around the bot's authentication.
-  // ----------------------------------------------------------------
-
-  const verifyLimit = createRateLimit({ windowMs: 60_000, max: 20 });
-
-  function proxyPlugin(target) {
-    return async (req, res) => {
-      const host = config.CONTROL_API_HOST || '127.0.0.1';
-      const port = config.CONTROL_API_PORT || 3001;
-      const path = typeof target === 'function' ? target(req) : target;
-
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-
-      try {
-        const upstream = await fetch(`http://${host}:${port}${path}`, {
-          method: req.method,
-          headers: {
-            authorization: req.get('authorization') || '',
-            ...(req.method === 'POST' ? { 'content-type': 'application/json' } : {}),
-          },
-          body: req.method === 'POST' ? JSON.stringify(req.body || {}) : undefined,
-          signal: controller.signal,
-        });
-
-        const text = await upstream.text();
-        res
-          .status(upstream.status)
-          .set('content-type', upstream.headers.get('content-type') || 'application/json')
-          .set('cache-control', 'no-store')
-          .send(text);
-      } catch {
-        res.status(502).json({ ok: false, error: 'the bot is unavailable' });
-      } finally {
-        clearTimeout(timer);
-      }
-    };
-  }
-
-  app.get('/api/plugin/health', proxyPlugin('/health'));
-  app.post('/api/plugin/verify', verifyLimit, express.json({ limit: '16kb' }), proxyPlugin('/verify'));
-  app.get(
-    '/api/plugin/player/:uuid/tiers',
-    proxyPlugin((req) => `/player/${encodeURIComponent(req.params.uuid)}/tiers`)
-  );
-
-  // ----------------------------------------------------------------
-  // Discord OAuth
-  // ----------------------------------------------------------------
-
-  app.get('/auth/discord', (req, res) => {
-    if (!config.DISCORD_CLIENT_ID || !config.DISCORD_CLIENT_SECRET) {
-      return res.status(503).render('error', {
-        title: 'Login not configured',
-        message: 'DISCORD_CLIENT_ID and DISCORD_CLIENT_SECRET are not set, so staff login is unavailable.',
-      });
-    }
-
-    const state = crypto.randomBytes(16).toString('hex');
-    session.setState(res, state, { secure: secureCookies });
-    res.redirect(discord.authorizeUrl(config, state));
-  });
-
-  app.get(config.DISCORD_OAUTH_REDIRECT || '/auth/discord/callback', async (req, res) => {
-    const expected = session.readState(req);
-    const { code, state, error } = req.query;
-
-    if (error) {
-      return res.status(400).render('error', {
-        title: 'Login cancelled',
-        message: `Discord returned: ${String(error).slice(0, 100)}`,
-      });
-    }
-    if (!code || !state || !expected || state !== expected) {
-      return res.status(400).render('error', {
-        title: 'Login failed',
-        message: 'The login state did not match. Start again from the admin link.',
-      });
-    }
-
-    try {
-      const token = await discord.exchangeCode(config, String(code));
-      const profile = await discord.fetchUser(token.access_token);
-
-      const user = {
-        id: profile.id,
-        username: profile.global_name || profile.username,
-        avatar: discord.avatarUrl(profile),
-        admin: adminIds.has(profile.id),
-        csrf: crypto.randomBytes(20).toString('hex'),
-      };
-
-      session.setSession(res, user, config.SESSION_SECRET, { secure: secureCookies });
-      logger.info(`website login: ${user.username} (${user.id}) admin=${user.admin}`);
-      res.redirect(user.admin ? '/admin' : '/');
-    } catch (err) {
-      logger.error('discord login failed:', err.message);
-      res.status(502).render('error', {
-        title: 'Login failed',
-        message: 'Discord did not complete the login. Please try again.',
-      });
-    }
-  });
-
-  app.post('/auth/logout', (req, res) => {
-    session.clearSession(res, { secure: secureCookies });
-    res.redirect('/');
-  });
-
-  // ----------------------------------------------------------------
-  // admin (OAuth-gated; every write is forwarded to the bot)
-  // ----------------------------------------------------------------
-
-  app.get('/admin', requireAdmin, async (req, res) => {
-    const overview = await botCall(config, '/admin/overview');
-
-    res.render('admin', {
-      user: req.user,
-      stats: data.adminStats(db),
-      overview: overview.ok ? overview.data : null,
-      botError: overview.ok ? null : overview.error,
-      message: req.query.ok || null,
-      error: req.query.error || null,
-      modes: gamemodes.all(),
-      tiers: tiers.TIERS,
-    });
-  });
-
-  app.post('/admin/reset', requireAdmin, checkCsrf, async (req, res) => {
-    const { scope, gamemode, player, guildId } = req.body;
-    if (!guildId) return fail(res, 'No server selected.');
-
-    // The player field accepts a Minecraft name; resolve it to a uuid and a
-    // Discord id from the shared database (read-only).
-    let uuid = null;
-    let playerId = null;
-    if (scope === 'player') {
-      const name = String(player || '').trim();
-      if (!name) return fail(res, 'Enter the Minecraft username to reset.');
-      const row = db
-        .prepare(
-          `SELECT p.uuid, la.discord_id
-             FROM players p
-             LEFT JOIN linked_accounts la ON la.uuid = p.uuid
-            WHERE p.username_lower = ? LIMIT 1`
-        )
-        .get(name.toLowerCase());
-      if (!row) return fail(res, `No player called **${name}** has been tested yet.`);
-      uuid = row.uuid;
-      playerId = row.discord_id || null;
-    }
-
-    const result = await botCall(config, '/admin/resettiers', {
-      method: 'POST',
-      body: {
-        guildId,
-        scope,
-        gamemodeKey: gamemode || null,
-        uuid,
-        playerId,
-        actorId: req.user.id,
-      },
-    });
-
-    if (!result.ok) return fail(res, result.error);
-    const d = result.data;
-    return res.redirect(
-      `/admin?ok=${encodeURIComponent(
-        `Reset done: ${d.tiers} tier(s) and ${d.cooldowns} cooldown(s) cleared, ${d.rolesRemoved} role(s) removed. Backup: ${d.backup}`
-      )}`
-    );
-  });
-
-  app.post('/admin/punish', requireAdmin, checkCsrf, async (req, res) => {
-    const { guildId, userId, type, reason, duration } = req.body;
-    if (!guildId) return fail(res, 'No server selected.');
-    if (!userId || !/^\d{5,25}$/.test(userId)) return fail(res, 'Enter the member\'s numeric Discord ID.');
-    if (!reason || !reason.trim()) return fail(res, 'A reason is required.');
-
-    const durationMs = duration ? require('../shared/store/punishments').parseDuration(duration) : null;
-    if (duration && !durationMs) return fail(res, 'Could not read that duration. Use e.g. 30m, 2h, 7d.');
-
-    const result = await botCall(config, '/admin/punishments', {
-      method: 'POST',
-      body: { guildId, userId, type, reason: reason.trim(), durationMs, actorId: req.user.id },
-    });
-
-    if (!result.ok) return fail(res, result.error);
-    return res.redirect(
-      `/admin?ok=${encodeURIComponent(`${type} recorded as case #${result.data.caseId}.`)}`
-    );
-  });
-
-  app.post('/admin/unban', requireAdmin, checkCsrf, async (req, res) => {
-    const { guildId, userId, scope } = req.body;
-    if (!guildId) return fail(res, 'No server selected.');
-    if (!userId || !/^\d{5,25}$/.test(userId)) return fail(res, 'Enter the member\'s numeric Discord ID.');
-
-    const result = await botCall(config, '/admin/unban', {
-      method: 'POST',
-      body: { guildId, userId, scope: scope || 'all', actorId: req.user.id },
-    });
-
-    if (!result.ok) return fail(res, result.error);
-    return res.redirect(
-      `/admin?ok=${encodeURIComponent(`Lifted ${result.data.lifted.length} ban(s).`)}`
-    );
-  });
-
-  app.use((req, res) => {
-    res.status(404).render('error', { title: 'Not found', message: 'That page does not exist.' });
-  });
-
-  return app;
+function bootFor() {
+  return {
+    discordInvite: '#',
+    refreshSeconds: 20,
+    modes: GAMEMODES.map((g) => ({ name: g.display, icon: g.icon, key: g.key })),
+    tiers: TIERS,
+    points: POINTS,
+    titles: TITLES,
+    products: PRODUCTS,
+    user: null,
+  };
 }
 
-if (require.main === module) {
-  const config = loadConfig('web');
-
-  if (!config.DISCORD_ADMIN_IDS) {
-    logger.warn('DISCORD_ADMIN_IDS is empty. Nobody can sign into /admin');
-  }
-  if (!config.PUBLIC_URL) {
-    logger.warn('PUBLIC_URL is empty. Discord OAuth redirect URIs will be wrong');
-  }
-
-  const db = openDatabase(config.DATABASE_PATH, { readonly: true });
-  const app = createApp({ db, config });
-
-  app.listen(config.WEB_PORT, config.WEB_HOST, () => {
-    logger.info(`website listening on http://${config.WEB_HOST}:${config.WEB_PORT}`);
+app.get('/', (req, res) => {
+  res.render('index', {
+    user: null,
+    boot: bootFor(),
+    counts: COUNTS,
   });
-}
+});
 
-module.exports = { createApp };
+app.get('/api/players', (req, res) => {
+  res.setHeader('cache-control', 'no-store');
+  res.json({
+    ok: true,
+    updatedAt: Date.now(),
+    counts: COUNTS,
+    players: PLAYERS,
+  });
+});
+
+app.get('/healthz', (req, res) => {
+  res.json({ ok: true, service: 'pixeltiers-web' });
+});
+
+app.use((req, res) => {
+  res.status(404).render('error', { title: 'Not found', message: 'That page does not exist.' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Pixel Tiers website listening on http://0.0.0.0:${PORT}`);
+});
+
+module.exports = app;
